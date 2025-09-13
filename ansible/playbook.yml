@@ -1,0 +1,25 @@
+- name: Setup container environment
+  hosts: helloworld
+  become: true
+  vars:
+    docker_edition: 'docker-ce=5:28.4.0-1~ubuntu.22.04~jammy'
+    docker_packages:
+      - "docker-ce=5:28.4.0-1~ubuntu.22.04~jammy"
+      - "docker-ce-cli=5:28.4.0-1~ubuntu.22.04~jammy"
+      - "containerd.io=1.7.27-1"
+      - "docker-buildx-plugin=0.27.0-1~ubuntu.22.04~jammy"
+
+    docker_users:
+      - azureadmin # TODO: should be the same user as in tf
+
+  roles:
+    - geerlingguy.docker
+
+  tasks: # TODO: Should this be in a separate play?
+    - name: Transfer project files
+      ansible.builtin.copy:
+        src: ../src/
+        dest: /home/azureadmin/helloworld/
+        owner: azureadmin
+        group: azureadmin
+        mode: '0755'

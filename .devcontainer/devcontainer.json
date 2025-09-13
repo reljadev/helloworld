@@ -1,0 +1,43 @@
+{
+  "name": "HelloWorld Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  
+  "features": {
+   "ghcr.io/devcontainers/features/terraform:1.4.1": {
+      "version": "1.13.1"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1.2.7": {
+      "version": "2.77.0"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2.5.4": {
+      "installZsh": false,
+      "installOhMyZsh": false,
+      "installOhMyZshConfig": false,
+      "upgradePackages": true,
+      "username": "vscode",
+      "uid": "13409",
+      "gid": "10000"
+    },
+    "ghcr.io/devcontainers/features/python:1.7.1": {
+      "version": "3.11",
+      "toolsToInstall": ["ansible", "ansible-core", "ansible-lint"]
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "hashicorp.terraform",
+        "ms-vscode.azurecli",
+        "redhat.ansible",
+        "ms-python.python",
+        "ms-python.pylint"
+      ]
+    }
+  },
+
+  // TODO: is there a different way to install roles and collections?
+  "postCreateCommand": "bash .devcontainer/configure_history.sh && ansible-galaxy role install geerlingguy.docker",
+
+  "remoteUser": "vscode"
+}

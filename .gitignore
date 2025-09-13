@@ -1,0 +1,35 @@
+# Ignore private keys
+*.pem
+
+# Ignore credentials files
+creds
+
+# Bash histrory
+.bash_history
+
+# Ignore Terraform state files
+*.tfstate
+*.tfstate.*
+crash.log
+.terraform/
+.terraform.lock.hcl
+
+# Ansible
+.ansible/
+
+# Python cache and virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+
+# VS Code settings
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,121 @@
+services:
+  database:
+    image: postgres:17-alpine3.22
+    container_name: postgres_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password # TODO: use secrets 
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
+
+  oidc-provider:
+    image: quay.io/keycloak/keycloak:26.3.3-0
+    container_name: oidc-provider
+    volumes:
+      - /home/vmadmin/certs/auth:/opt/keycloak/certs:ro
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://database:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: password
+
+      KC_HOSTNAME: auth-hylastix.duckdns.org # TODO: configure custom domain
+      KC_HOSTNAME_STRICT: true
+      KC_HOSTNAME_STRICT_HTTPS: true
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/fullchain.pem
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/privkey.pem
+
+      # KC_LOG_LEVEL: info
+      KC_METRICS_ENABLED: true
+      KC_HEALTH_ENABLED: true
+      KEYCLOAK_ADMIN: admin # TODO: deprecated in favor of KC_BOOTSTRAP_ADMIN_USERNAME
+      KEYCLOAK_ADMIN_PASSWORD: adminrandom # TODO: use secrets
+    command: start-dev # TODO: switch to "start" for production
+    depends_on:
+      - database
+    ports:
+      - 8443:8443
+      - 8080:8080
+      - 9000:9000
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<> /dev/tcp/127.0.0.1/9000; echo -e 'GET /health/ready HTTP/1.1\\r\\nhost: http://localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3; if [ $? -eq 0 ]; then echo 'Healthcheck Successful'; exit 0; else echo 'Healthcheck Failed'; exit 1; fi;"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 512M
+
+  web-server:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.12.0-alpine
+    container_name: oauth2_proxy
+    ports:
+      - "443:4443"
+      - "80:4180"
+    volumes:
+      - ./site:/var/www/static/:ro
+      - /opt/certs/site:/certs:ro
+    environment:
+      # The authentication provider type. "keycloak-oidc" for Keycloak.
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      # The OIDC issuer URL.
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://auth-hylastix.duckdns.org:8443/realms/helloworld
+      # The OIDC client ID.
+      OAUTH2_PROXY_CLIENT_ID: webserver
+      # The OIDC client secret.
+      #  See issue: https://github.com/oauth2-proxy/oauth2-proxy/issues/1714
+      OAUTH2_PROXY_CLIENT_SECRET: placeholder-since-secret-must-be-set-even-with-PKCE
+      # The URL to which the IdP will redirect after authentication.
+      OAUTH2_PROXY_REDIRECT_URL: https://site-hylastix.duckdns.org/oauth2/callback # TODO: configure custom domain
+      # The PKCE code challenge method for OIDC. "S256" is recommended.
+      OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
+      # If true, skips the oauth2-proxy login page and redirects directly to the IdP.
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: true
+      # Allowed email domains for authentication. Use "*" to allow all domains.
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      # Don't fail if an email address in an id_token is not verified
+      OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: true
+      
+      # The upstream URL(s) that oauth2-proxy will serve after authentication. Here, it serves static files.
+      OAUTH2_PROXY_UPSTREAMS: file:///var/www/static/#/
+      
+      # HTTPS configuration
+      OAUTH2_PROXY_HTTPS_ADDRESS: 0.0.0.0:4443
+      OAUTH2_PROXY_TLS_CERT_FILE: /certs/fullchain.pem
+      OAUTH2_PROXY_TLS_KEY_FILE: /certs/privkey.pem
+      # The address and port oauth2-proxy listens on inside the container.
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_FORCE_HTTPS_REDIRECT: true
+      # The seed string for secure cookies (signed & encrypted).
+      # See: https://oauth2-proxy.github.io/oauth2-proxy/configuration/session_storage/#cookie-storage
+      OAUTH2_PROXY_COOKIE_SECRET: F619F6FFF8901F21EE58C0EA22AB0400
+      # If true, cookies will only be sent over HTTPS. Set to "false" for local development.
+      OAUTH2_PROXY_COOKIE_SECURE: true  # TODO: Set to true for HTTPS
+      
+      # The session cookie expiration duration ("XhXmXs" format).
+      OAUTH2_PROXY_COOKIE_EXPIRE: 8h
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 32M
+      
+    depends_on:
+      oidc-provider:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
