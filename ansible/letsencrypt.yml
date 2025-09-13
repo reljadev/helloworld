@@ -1,0 +1,9 @@
+le_certificates:
+  - common_name: "auth.demo.milanrelji.com"
+    basedir: "/etc/letsencrypt"
+    domain: ".demo.milanreljin.com"
+    email: milan54321@hotmail.com # TODO: change to my email
+  - common_name: "site.demo.milanrelji.com"
+    basedir: "/etc/letsencrypt"
+    domain: ".demo.milanreljin.com"
+    email: milan54321@hotmail.com # TODO: change to my email

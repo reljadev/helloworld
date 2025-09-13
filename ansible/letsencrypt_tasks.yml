@@ -1,0 +1,167 @@
+- name: Create directory to store certificate information
+  ansible.builtin.file:
+    path: "{{ item.basedir }}"
+    state: directory
+    mode: "0710"
+    owner: "{{ cert_directory_user }}"
+    group: "{{ cert_directory_group }}"
+
+- name: Check if account private key exists
+  ansible.builtin.stat:
+    path: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+  register: account_key
+
+# TODO: why not just generate key on managed node?
+- name: Generate and copy over the acme account private key
+  when: not account_key.stat.exists | bool
+  block:
+    - name: Generate private account key for letsencrypt
+      community.crypto.openssl_privatekey:
+        path: /tmp/account_{{ item.common_name }}.key
+        type: RSA
+      delegate_to: localhost
+      become: false
+      when: not account_key.stat.exists | bool
+
+    - name: Copy over private account key to client
+      ansible.builtin.copy:
+        src: /tmp/account_{{ item.common_name }}.key
+        dest: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+        mode: "0640"
+        owner: root
+        group: root
+
+- name: Check if certificate private key exists
+  ansible.builtin.stat:
+    path: "{{ item.basedir }}/{{ item.common_name }}.key"
+  register: cert_key
+
+# TODO: why not just generate key on managed node?
+- name: Generate and copy over the acme cert private key
+  when: not cert_key.stat.exists | bool
+  block:
+    - name: Generate private acme key for letsencrypt
+      community.crypto.openssl_privatekey:
+        path: /tmp/{{ item.common_name }}.key
+        type: RSA
+      delegate_to: localhost
+      become: false
+      when: not cert_key.stat.exists | bool
+
+    - name: Copy over private acme key to client
+      ansible.builtin.copy:
+        src: /tmp/{{ item.common_name }}.key
+        dest: "{{ item.basedir }}/{{ item.common_name }}.key"
+        mode: "0640"
+        owner: root
+        group: root
+
+# TODO: again, much simpler to just generate csr on managed node
+- name: Generate and copy over the csr
+  block:
+    - name: Grab the private key from the host
+      ansible.builtin.slurp:
+        src: "{{ item.basedir }}/{{ item.common_name }}.key"
+      register: remote_cert_key
+
+    - name: Generate the csr
+      community.crypto.openssl_csr:
+        path: /tmp/{{ item.common_name }}.csr
+        privatekey_content: "{{ remote_cert_key['content'] | b64decode }}"
+        common_name: "{{ item.common_name }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Copy over csr to client
+      ansible.builtin.copy:
+        src: /tmp/{{ item.common_name }}.csr
+        dest: "{{ item.basedir }}/{{ item.common_name }}.csr"
+        mode: "0640"
+        owner: root
+        group: root
+
+- name: Create a challenge using an account key file.
+  community.crypto.acme_certificate:
+    account_key_src: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+    account_email: "{{ item.email }}"
+    csr: "{{ item.basedir }}/{{ item.common_name }}.csr"
+    cert: "{{ item.basedir }}/{{ item.common_name }}.crt"
+    challenge: http-01
+    acme_directory: "{{ acme_dir }}"
+    terms_agreed: true
+  register: cert_challenge
+
+- name: Actual certificate creation
+  when: cert_challenge is changed and item.common_name in cert_challenge.challenge_data
+  block:
+    # - name: Create DNS challenge record on DO
+    #   community.digitalocean.digital_ocean_domain_record:
+    #     state: present
+    #     oauth_token: "{{ do_api_token }}"
+    #     domain: "{{ item.domain[1:] }}"
+    #     type: TXT
+    #     ttl: 60
+    #     name: "{{ cert_challenge.challenge_data[item.common_name]['dns-01'].record | replace(item.domain, '') }}"
+    #     data: "{{ cert_challenge.challenge_data[item.common_name]['dns-01'].resource_value }}"
+    #   delegate_to: localhost
+    #   become: false
+
+    - name: Start temporary http-01 challenge webserver
+      community.docker.docker_container:
+        name: acme-challenge-web
+        image: nginx:alpine
+        ports:
+          - "80:80"
+        volumes:
+          - /var/www/html:/usr/share/nginx/html:ro
+      become: true
+
+    - name: Create http-01 endpoint on domain
+      when: cert_challenge is changed and item.common_name in cert_challenge.challenge_data
+      ansible.builtin.copy:
+        content: "{{ cert_challenge.challenge_data[item.common_name]['http-01'].resource_value }}"
+        dest: /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] }}
+
+    - name: Let the challenge be validated and retrieve the cert and intermediate certificate
+      community.crypto.acme_certificate:
+        account_key_src: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+        csr: "{{ item.basedir }}/{{ item.common_name }}.csr"
+        cert: "{{ item.basedir }}/{{ item.common_name }}.crt"
+        fullchain: "{{ item.basedir }}/{{ item.domain[1:] }}-fullchain.crt"
+        chain: "{{ item.basedir }}/{{ item.domain[1:] }}-intermediate.crt"
+        challenge: http-01
+        acme_directory: "{{ acme_dir }}"
+        terms_agreed: true
+        data: "{{ cert_challenge }}"
+
+    - name: Remove temporary http-01 challenge webserver
+      community.docker.docker_container:
+        name: acme-challenge-web
+        state: absent
+      become: true
+
+    # - name: Let the challenge be validated and retrieve the cert and intermediate certificate
+    #   community.crypto.acme_certificate:
+    #     account_key_src: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+    #     account_email: "{{ item.email }}"
+    #     src: "{{ item.basedir }}/{{ item.common_name }}.csr"
+    #     cert: "{{ item.basedir }}/{{ item.common_name }}.crt"
+    #     fullchain: "{{ item.basedir }}/{{ item.domain[1:] }}-fullchain.crt"
+    #     chain: "{{ item.basedir }}/{{ item.domain[1:] }}-intermediate.crt"
+    #     challenge: dns-01
+    #     acme_version: 2
+    #     acme_directory: "{{ acme_dir }}"
+    #     remaining_days: 60
+    #     terms_agreed: true
+    #     data: "{{ cert_challenge }}"
+
+    # - name: Remove DNS challenge record on DO
+    #   community.digitalocean.digital_ocean_domain_record:
+    #     state: absent
+    #     oauth_token: "{{ do_api_token }}"
+    #     domain: "{{ item.domain[1:] }}"
+    #     type: TXT
+    #     name: "{{ cert_challenge.challenge_data[item.common_name]['dns-01'].record | replace(item.domain, '') }}"
+    #     data: "{{ cert_challenge.challenge_data[item.common_name]['dns-01'].resource_value }}"
+    #   delegate_to: localhost
+    #   become: false

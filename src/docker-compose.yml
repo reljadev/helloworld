@@ -70,14 +70,14 @@ services:
       # The authentication provider type. "keycloak-oidc" for Keycloak.
       OAUTH2_PROXY_PROVIDER: keycloak-oidc
       # The OIDC issuer URL.
-      OAUTH2_PROXY_OIDC_ISSUER_URL: https://auth-hylastix.duckdns.org:8443/realms/helloworld
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://auth.demo.milanreljin.com/realms/helloworld
       # The OIDC client ID.
       OAUTH2_PROXY_CLIENT_ID: webserver
       # The OIDC client secret.
       #  See issue: https://github.com/oauth2-proxy/oauth2-proxy/issues/1714
       OAUTH2_PROXY_CLIENT_SECRET: placeholder-since-secret-must-be-set-even-with-PKCE
       # The URL to which the IdP will redirect after authentication.
-      OAUTH2_PROXY_REDIRECT_URL: https://site-hylastix.duckdns.org/oauth2/callback # TODO: configure custom domain
+      OAUTH2_PROXY_REDIRECT_URL: https://site.demo.milanreljin.com/oauth2/callback # TODO: configure custom domain
       # The PKCE code challenge method for OIDC. "S256" is recommended.
       OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
       # If true, skips the oauth2-proxy login page and redirects directly to the IdP.
@@ -99,7 +99,7 @@ services:
       OAUTH2_PROXY_FORCE_HTTPS_REDIRECT: true
       # The seed string for secure cookies (signed & encrypted).
       # See: https://oauth2-proxy.github.io/oauth2-proxy/configuration/session_storage/#cookie-storage
-      OAUTH2_PROXY_COOKIE_SECRET: F619F6FFF8901F21EE58C0EA22AB0400
+      OAUTH2_PROXY_COOKIE_SECRET: F619F6FFF8901F21EE58C0EA22AB0400 # TODO: use secrets
       # If true, cookies will only be sent over HTTPS. Set to "false" for local development.
       OAUTH2_PROXY_COOKIE_SECURE: true  # TODO: Set to true for HTTPS
       

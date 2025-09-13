@@ -2,6 +2,7 @@
   hosts: helloworld
   become: true
   vars:
+    # Docker configuration
     docker_edition: 'docker-ce=5:28.4.0-1~ubuntu.22.04~jammy'
     docker_packages:
       - "docker-ce=5:28.4.0-1~ubuntu.22.04~jammy"
@@ -11,6 +12,10 @@
 
     docker_users:
       - azureadmin # TODO: should be the same user as in tf
+
+    # Let's Encrypt configuration
+    debug: false
+    acme_dir: https://acme-v02.api.letsencrypt.org/directory
 
   roles:
     - geerlingguy.docker
@@ -23,3 +28,7 @@
         owner: azureadmin
         group: azureadmin
         mode: '0755'
+
+    - name: Include letsencrypt tasks for each certificate
+      ansible.builtin.include_tasks: letsencrypt_tasks.yml
+      loop: "{{ le_certificates }}"
