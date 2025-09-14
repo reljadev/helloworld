@@ -57,7 +57,7 @@ resource "azurerm_network_security_group" "nsg" {
 
   security_rule {
     name                       = "SSH"
-    priority                   = 1001
+    priority                   = 1010
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -69,7 +69,7 @@ resource "azurerm_network_security_group" "nsg" {
 
   security_rule {
     name                       = "HTTP"
-    priority                   = 1002
+    priority                   = 1020
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -78,6 +78,19 @@ resource "azurerm_network_security_group" "nsg" {
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
+
+  security_rule {
+    name                       = "HTTPS"
+    priority                   = 1030
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_ranges    = ["443", "8443"] # TODO: remove 8443
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+
 }
 
 # network interface
