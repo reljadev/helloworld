@@ -67,19 +67,27 @@
           - /var/www/html:/usr/share/nginx/html:ro
       become: true
 
+    # TODO: fix object of type 'dict' has no attribute 'challenge_data'
     - name: Create http-01 endpoint on domain
       when: cert_challenge is changed and item.common_name in cert_challenge.challenge_data
-      ansible.builtin.copy:
-        content: "{{ cert_challenge.challenge_data[item.common_name]['http-01'].resource_value }}"
-        dest: /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] }}
+      block:
+        - name: Create /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] | dirname }} directories
+          ansible.builtin.file:
+            path: /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] | dirname }}
+            state: directory
+
+        - name: Copy http-01 files to webroot
+          ansible.builtin.copy:
+            content: "{{ cert_challenge.challenge_data[item.common_name]['http-01'].resource_value }}"
+            dest: /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] }}
 
     - name: Let the challenge be validated and retrieve the cert and intermediate certificate
       community.crypto.acme_certificate:
         account_key_src: "{{ item.basedir }}/account_{{ item.common_name }}.key"
         csr: "{{ item.basedir }}/{{ item.common_name }}.csr"
         cert: "{{ item.basedir }}/{{ item.common_name }}.crt"
-        fullchain: "{{ item.basedir }}/{{ item.domain[1:] }}-fullchain.crt"
-        chain: "{{ item.basedir }}/{{ item.domain[1:] }}-intermediate.crt"
+        fullchain: "{{ item.basedir }}/{{ item.common_name }}-fullchain.crt"
+        chain: "{{ item.basedir }}/{{ item.common_name }}-intermediate.crt"
         challenge: http-01
         acme_directory: "{{ acme_dir }}"
         terms_agreed: true

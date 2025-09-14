@@ -8,38 +8,49 @@ services:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: password # TODO: use secrets 
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready", "-d", "keycloak"]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 256M
         reservations:
-          memory: 32M
+          memory: 128M
 
+# TODO: containers shouldn't be run as root
+# TODO: can realm be configured automatically ?
   oidc-provider:
     image: quay.io/keycloak/keycloak:26.3.3-0
     container_name: oidc-provider
     volumes:
-      - /home/vmadmin/certs/auth:/opt/keycloak/certs:ro
+      - /etc/letsencrypt:/opt/keycloak/certs:ro
     environment:
       KC_DB: postgres
       KC_DB_URL: jdbc:postgresql://database:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: password
 
-      KC_HOSTNAME: auth-hylastix.duckdns.org # TODO: configure custom domain
+      KC_HOSTNAME: auth.demo.milanreljin.com
       KC_HOSTNAME_STRICT: true
       KC_HOSTNAME_STRICT_HTTPS: true
-      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/fullchain.pem
-      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/privkey.pem
+      # TODO: filename should be read from var
+      # TODO: keycloak musn't have access to websites private key and vice versa !
+      KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/auth.demo.milanreljin.com-fullchain.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/auth.demo.milanreljin.com.key
 
       # KC_LOG_LEVEL: info
       KC_METRICS_ENABLED: true
       KC_HEALTH_ENABLED: true
       KEYCLOAK_ADMIN: admin # TODO: deprecated in favor of KC_BOOTSTRAP_ADMIN_USERNAME
       KEYCLOAK_ADMIN_PASSWORD: adminrandom # TODO: use secrets
-    command: start-dev # TODO: switch to "start" for production
+    command: start-dev # TODO: switch to production
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     ports:
       - 8443:8443
       - 8080:8080
@@ -62,15 +73,14 @@ services:
     container_name: oauth2_proxy
     ports:
       - "443:4443"
-      - "80:4180"
     volumes:
       - ./site:/var/www/static/:ro
-      - /opt/certs/site:/certs:ro
+      - /etc/letsencrypt:/certs:ro
     environment:
       # The authentication provider type. "keycloak-oidc" for Keycloak.
       OAUTH2_PROXY_PROVIDER: keycloak-oidc
       # The OIDC issuer URL.
-      OAUTH2_PROXY_OIDC_ISSUER_URL: https://auth.demo.milanreljin.com/realms/helloworld
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://auth.demo.milanreljin.com:8443/realms/helloworld
       # The OIDC client ID.
       OAUTH2_PROXY_CLIENT_ID: webserver
       # The OIDC client secret.
@@ -92,8 +102,8 @@ services:
       
       # HTTPS configuration
       OAUTH2_PROXY_HTTPS_ADDRESS: 0.0.0.0:4443
-      OAUTH2_PROXY_TLS_CERT_FILE: /certs/fullchain.pem
-      OAUTH2_PROXY_TLS_KEY_FILE: /certs/privkey.pem
+      OAUTH2_PROXY_TLS_CERT_FILE: /certs/site.demo.milanreljin.com-fullchain.crt
+      OAUTH2_PROXY_TLS_KEY_FILE: /certs/site.demo.milanreljin.com.key
       # The address and port oauth2-proxy listens on inside the container.
       OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
       OAUTH2_PROXY_FORCE_HTTPS_REDIRECT: true
@@ -101,7 +111,7 @@ services:
       # See: https://oauth2-proxy.github.io/oauth2-proxy/configuration/session_storage/#cookie-storage
       OAUTH2_PROXY_COOKIE_SECRET: F619F6FFF8901F21EE58C0EA22AB0400 # TODO: use secrets
       # If true, cookies will only be sent over HTTPS. Set to "false" for local development.
-      OAUTH2_PROXY_COOKIE_SECURE: true  # TODO: Set to true for HTTPS
+      OAUTH2_PROXY_COOKIE_SECURE: true
       
       # The session cookie expiration duration ("XhXmXs" format).
       OAUTH2_PROXY_COOKIE_EXPIRE: 8h

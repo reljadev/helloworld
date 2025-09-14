@@ -1,6 +1,8 @@
 - name: Setup container environment
   hosts: helloworld
   become: true
+  vars_files:
+    - letsencrypt.yml
   vars:
     # Docker configuration
     docker_edition: 'docker-ce=5:28.4.0-1~ubuntu.22.04~jammy'
@@ -16,9 +18,11 @@
     # Let's Encrypt configuration
     debug: false
     acme_dir: https://acme-v02.api.letsencrypt.org/directory
+    cert_directory_user: root
+    cert_directory_group: root
 
-  roles:
-    - geerlingguy.docker
+  # roles:
+  #   - geerlingguy.docker
 
   tasks: # TODO: Should this be in a separate play?
     - name: Transfer project files
