@@ -21,8 +21,8 @@
     cert_directory_user: root
     cert_directory_group: root
 
-  # roles:
-  #   - geerlingguy.docker
+  roles:
+    - geerlingguy.docker
 
   tasks: # TODO: Should this be in a separate play?
     - name: Transfer project files
@@ -36,3 +36,7 @@
     - name: Include letsencrypt tasks for each certificate
       ansible.builtin.include_tasks: letsencrypt_tasks.yml
       loop: "{{ le_certificates }}"
+
+    - name: Run docker services
+      community.docker.docker_compose_v2:
+        project_src: /home/azureadmin/helloworld/
