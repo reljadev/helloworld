@@ -31,7 +31,10 @@ jobs:
     
     - name: Get SSH key
       run: |
-        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        az login --service-principal \
+          --username $ARM_CLIENT_ID \
+          --password $ARM_CLIENT_SECRET \
+          --tenant $ARM_TENANT_ID
         az keyvault secret show --vault-name "${{ inputs.key_vault_name }}" --name "ssh-private-key" --query "value" -o tsv > ssh_key
         chmod 600 ssh_key
     
