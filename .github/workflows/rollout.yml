@@ -1,4 +1,4 @@
-name: Manual Workflow
+name: Roll-out
 
 on:
   workflow_dispatch:
@@ -28,6 +28,6 @@ jobs:
       run: terraform init
       working-directory: terraform
     
-    - name: Terraform Plan
-      run: terraform plan -no-color
+    - name: Terraform Apply
+      run: terraform apply -auto-approve
       working-directory: terraform
