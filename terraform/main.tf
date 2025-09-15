@@ -7,7 +7,7 @@ terraform {
     }
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "~> 3.0.2"
+      version = "~> 3.9.0"
     }
   }
 
@@ -30,7 +30,7 @@ resource "azurerm_resource_group" "rg" {
   location = var.resource_group_location
 }
 
-# AWS
+# Network
 resource "azurerm_virtual_network" "network" {
   name                = "hw_net"
   address_space       = ["10.0.0.0/24"] #TODO: smaller range
@@ -38,7 +38,6 @@ resource "azurerm_virtual_network" "network" {
   resource_group_name = azurerm_resource_group.rg.name
 }
 
-# subnet
 resource "azurerm_subnet" "subnet" {
   name                 = "hw_subnet"
   resource_group_name  = azurerm_resource_group.rg.name
@@ -46,7 +45,6 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = ["10.0.0.0/28"] 
 }
 
-# public IP
 resource "azurerm_public_ip" "public_ip" {
   name                = "hw_public_ip"
   location            = azurerm_resource_group.rg.location
@@ -55,8 +53,6 @@ resource "azurerm_public_ip" "public_ip" {
   sku                 = "Standard"
 }
 
-# TODO: need rules for HTTP, HTTPS
-# network security group and rule
 resource "azurerm_network_security_group" "nsg" {
   name                = "hw_nsg"
   location            = azurerm_resource_group.rg.location
@@ -100,7 +96,6 @@ resource "azurerm_network_security_group" "nsg" {
 
 }
 
-# network interface
 resource "azurerm_network_interface" "nic" {
   name                = "hw_nic"
   location            = azurerm_resource_group.rg.location
@@ -114,15 +109,12 @@ resource "azurerm_network_interface" "nic" {
   }
 }
 
-# TODO: in AWS sec group ties to instance, here to NIC?
-# security group ↔ network interface
 resource "azurerm_network_interface_security_group_association" "example" {
   network_interface_id      = azurerm_network_interface.nic.id
   network_security_group_id = azurerm_network_security_group.nsg.id
 }
 
-# TODO: fix ssh before pushing to source control
-# virtual machine
+# VM
 resource "azurerm_linux_virtual_machine" "vm" {
   name                  = "hw_vm"
   location              = azurerm_resource_group.rg.location
@@ -152,7 +144,40 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 }
 
-# Create DNS Zone
+# SSH key storage
+resource "random_pet" "kv_name" {
+  prefix    = "kv"
+  separator = ""
+}
+
+data "azurerm_client_config" "current" {}
+
+output "object_id" {
+  value = data.azurerm_client_config.current.object_id
+}
+
+resource "azurerm_key_vault" "hw_kv" {
+  name                = random_pet.kv_name.id
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  sku_name            = "standard"
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = data.azurerm_client_config.current.object_id
+
+    secret_permissions = ["Get", "Set"]
+  }
+}
+
+resource "azurerm_key_vault_secret" "ssh_private_key" {
+  name         = "ssh-private-key"
+  value        = azapi_resource_action.ssh_public_key_gen.output.privateKey
+  key_vault_id = azurerm_key_vault.hw_kv.id
+}
+
+# DNS
 resource "azurerm_dns_zone" "zone" {
   name                = "demo.milanreljin.com"
   resource_group_name = azurerm_resource_group.rg.name
@@ -172,9 +197,4 @@ resource "azurerm_dns_a_record" "site" {
   resource_group_name = azurerm_resource_group.rg.name
   ttl                 = 300
   records             = [azurerm_public_ip.public_ip.ip_address]
-}
-
-# Output the nameservers
-output "azure_nameservers" {
-  value = azurerm_dns_zone.zone.name_servers
 }
