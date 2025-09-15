@@ -1,0 +1,50 @@
+name: Run Ansible
+
+on:
+  workflow_dispatch:
+    inputs:
+      public_ip:
+        description: 'Public IP address'
+        required: true
+        type: string
+      key_vault_name:
+        description: 'Key Vault name'
+        required: true
+        type: string
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+
+jobs:
+  ansible-run:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Ansible
+      run: |
+        pip install ansible
+    
+    - name: Get SSH key
+      run: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        az login --service-principal -u $ARM_CLIENT_ID -p $ARM_CLIENT_SECRET --tenant $ARM_TENANT_ID
+        az keyvault secret show --vault-name "${{ inputs.key_vault_name }}" --name "ssh-private-key" --query "value" -o tsv > ssh_key
+        chmod 600 ssh_key
+    
+    - name: Run Ansible
+      working-directory: ansible
+      run: |
+        cat > inventory.yml << EOF
+        helloworld:
+          hosts:
+            ${{ inputs.public_ip }}:
+              ansible_user: azureuser
+              ansible_ssh_private_key_file: ./ssh_key
+              ansible_ssh_extra_args: "-o IdentitiesOnly=yes"
+        EOF
+        ansible-playbook -i inventory.yml playbook.yml
