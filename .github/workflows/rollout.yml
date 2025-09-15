@@ -10,9 +10,9 @@ env:
   ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
 
 jobs:
-  terraform-plan:
+  terraform-apply:
     environment: helloworld
-    name: Terraform Plan
+    name: Terraform Apply
     runs-on: ubuntu-latest
     
     steps:
