@@ -11,7 +11,7 @@ env:
 
 jobs:
   terraform-plan:
-    environment: only_me
+    environment: helloworld
     name: Terraform Plan
     runs-on: ubuntu-latest
     
