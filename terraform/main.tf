@@ -12,6 +12,13 @@ terraform {
   }
 
   required_version = ">= 1.1.0"
+
+  backend "azurerm" {
+    resource_group_name  = "terraform-state"
+    storage_account_name = "tfstate31i2o312ad"
+    container_name       = "tfstate"
+    key                  = "terraform.tfstate"
+  }
 }
 
 provider "azurerm" {
