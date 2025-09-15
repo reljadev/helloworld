@@ -1,0 +1,100 @@
+- name: Create directory to store certificate information
+  ansible.builtin.file:
+    path: "{{ item.basedir }}"
+    state: directory
+    mode: "0710"
+    owner: "{{ cert_directory_user }}"
+    group: "{{ cert_directory_group }}"
+
+- name: Check if account private key exists
+  ansible.builtin.stat:
+    path: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+  register: account_key
+
+- name: Generate acme account private key
+  when: not account_key.stat.exists | bool
+  community.crypto.openssl_privatekey:
+    type: RSA
+    path: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+    mode: "0640"
+    owner: root
+    group: root
+
+- name: Check if certificate private key exists
+  ansible.builtin.stat:
+    path: "{{ item.basedir }}/{{ item.common_name }}.key"
+  register: cert_key
+
+- name: Generate acme cert private key
+  when: not cert_key.stat.exists | bool
+  community.crypto.openssl_privatekey:
+    type: RSA
+    path: "{{ item.basedir }}/{{ item.common_name }}.key"
+    mode: "0640"
+    owner: root
+    group: root
+
+- name: Generate csr
+  community.crypto.openssl_csr:
+    privatekey_path: "{{ item.basedir }}/{{ item.common_name }}.key"
+    common_name: "{{ item.common_name }}"
+    path: "{{ item.basedir }}/{{ item.common_name }}.csr"
+    mode: "0640"
+    owner: root
+    group: root
+
+- name: Create a challenge using an account key file
+  community.crypto.acme_certificate:
+    account_key_src: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+    account_email: "{{ item.email }}"
+    csr: "{{ item.basedir }}/{{ item.common_name }}.csr"
+    cert: "{{ item.basedir }}/{{ item.common_name }}.crt"
+    challenge: http-01
+    acme_directory: "{{ acme_dir }}"
+    terms_agreed: true
+  register: cert_challenge
+
+- name: Actual certificate creation
+  when: cert_challenge is changed and item.common_name in cert_challenge.challenge_data
+  block:
+    - name: Start temporary http-01 challenge webserver
+      community.docker.docker_container:
+        name: acme-challenge-web
+        image: nginx:alpine
+        ports:
+          - "80:80"
+        volumes:
+          - /var/www/html:/usr/share/nginx/html:ro
+      become: true
+
+    # TODO: fix object of type 'dict' has no attribute 'challenge_data'
+    - name: Create http-01 endpoint on domain
+      when: cert_challenge is changed and item.common_name in cert_challenge.challenge_data
+      block:
+        - name: Create /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] | dirname }} directories
+          ansible.builtin.file:
+            path: /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] | dirname }}
+            state: directory
+
+        - name: Copy http-01 files to webroot
+          ansible.builtin.copy:
+            content: "{{ cert_challenge.challenge_data[item.common_name]['http-01'].resource_value }}"
+            dest: /var/www/html/{{ cert_challenge.challenge_data[item.common_name]['http-01']['resource'] }}
+
+    - name: Let the challenge be validated and retrieve the cert and intermediate certificate
+      community.crypto.acme_certificate:
+        account_key_src: "{{ item.basedir }}/account_{{ item.common_name }}.key"
+        csr: "{{ item.basedir }}/{{ item.common_name }}.csr"
+        cert: "{{ item.basedir }}/{{ item.common_name }}.crt"
+        fullchain: "{{ item.basedir }}/{{ item.common_name }}-fullchain.crt"
+        chain: "{{ item.basedir }}/{{ item.common_name }}-intermediate.crt"
+        challenge: http-01
+        acme_directory: "{{ acme_dir }}"
+        terms_agreed: true
+        data: "{{ cert_challenge }}"
+
+    - name: Remove temporary http-01 challenge webserver
+      community.docker.docker_container:
+        name: acme-challenge-web
+        state: absent
+      become: true

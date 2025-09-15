@@ -40,3 +40,5 @@ cd /opt/keycloak/bin/
 ./kcadm.sh update realms/master -s sslRequired=NONE
 
 - how many credits do I have in Azure? Would they cover a custom domain?
+
+- caddy for automatic TLS certs?

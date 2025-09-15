@@ -36,8 +36,8 @@
     }
   },
 
-  // TODO: is there a different way to install roles and collections?
-  "postCreateCommand": "bash .devcontainer/configure_history.sh && ansible-galaxy role install geerlingguy.docker",
+  // TODO: is there a different way to install roles and collections? hardcode versions too
+  "postCreateCommand": "bash .devcontainer/configure_history.sh && ansible-galaxy role install -r ansible/requirements.yml && ansible-galaxy collection install -r ansible/requirements.yml",
 
   "remoteUser": "vscode"
 }
