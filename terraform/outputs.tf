@@ -14,6 +14,11 @@ output "kv_name" {
   value = azurerm_key_vault.hw_kv.name
 }
 
-output "key_data" {
+output "ssh_public_key" {
   value = azapi_resource_action.ssh_public_key_gen.output.publicKey
+}
+
+output "ssh_private_key" {
+  value     = azapi_resource_action.ssh_public_key_gen.output.privateKey
+  sensitive = true
 }
