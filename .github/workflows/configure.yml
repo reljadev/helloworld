@@ -7,11 +7,7 @@ on:
         description: 'Public IP address'
         required: true
         type: string
-      key_vault_name:
-        description: 'Key Vault name'
-        required: true
-        type: string
-
+        
 env:
   ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
   ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
