@@ -10,10 +10,6 @@ output "azure_nameservers" {
   value = azurerm_dns_zone.zone.name_servers
 }
 
-output "kv_name" {
-  value = azurerm_key_vault.hw_kv.name
-}
-
 output "ssh_public_key" {
   value = azapi_resource_action.ssh_public_key_gen.output.publicKey
 }
