@@ -28,14 +28,16 @@ jobs:
       run: terraform init
       working-directory: terraform
     
-    - name: Terraform Apply
-      run: terraform apply -auto-approve
-      working-directory: terraform
+    # - name: Terraform Apply
+    #   run: terraform apply -auto-approve
+    #   working-directory: terraform
 
     - name: Store SSH private key in GitHub Secret
       working-directory: terraform
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SECRET_MANAGER_TOKEN: ${{ secrets.SECRET_MANAGER_TOKEN }}
       run: |
         SSH_KEY=$(terraform output -raw ssh_private_key)
-        echo "$SSH_KEY" | gh secret set SSH_PRIVATE_KEY --repo ${{ github.repository }}
+        echo "$SSH_KEY" | gh secret set SSH_PRIVATE_KEY \
+          --env helloworld \
+          --repo ${{ github.repository }}
