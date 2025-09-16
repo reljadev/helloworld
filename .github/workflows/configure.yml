@@ -20,6 +20,7 @@ env:
 
 jobs:
   ansible-run:
+    environment: helloworld
     runs-on: ubuntu-latest
     
     steps:
