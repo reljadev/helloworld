@@ -42,7 +42,7 @@ jobs:
         helloworld:
           hosts:
             ${{ inputs.public_ip }}:
-              ansible_user: azureuser
+              ansible_user: azureadmin
               ansible_ssh_private_key_file: ./ssh_key
               ansible_ssh_extra_args: "-o IdentitiesOnly=yes -o StrictHostKeyChecking=no"
         EOF
