@@ -28,10 +28,11 @@ jobs:
       run: terraform init
       working-directory: terraform
     
-    # - name: Terraform Apply
-    #   run: terraform apply -auto-approve
-    #   working-directory: terraform
+    - name: Terraform Apply
+      run: terraform apply -auto-approve
+      working-directory: terraform
 
+    # TODO: secrets shouldn't be stored in state file
     - name: Store SSH private key in GitHub Secret
       working-directory: terraform
       env:
